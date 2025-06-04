@@ -28,6 +28,14 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     SOFARAudioProcessor& audioProcessor;
+    juce::Slider distanceSlider;
+    juce::Label distanceLabel;
+    juce::TextButton buttonA { "A" };
+    juce::TextButton buttonB { "B" };
+    juce::TextButton buttonC { "C" };
+    juce::TextButton buttonD { "D" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> distanceAttachment;
+    void attachButton(juce::TextButton& button, int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SOFARAudioProcessorEditor)
 };

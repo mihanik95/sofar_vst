@@ -13,6 +13,9 @@
 //==============================================================================
 /**
 */
+#include "SimpleConvolution.h"
+#include "IRData.h"
+
 class SOFARAudioProcessor  : public juce::AudioProcessor
 {
 public:
@@ -52,6 +55,15 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    juce::AudioProcessorValueTreeState parameters;
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+
+    std::vector<float> currentIR;
+    int currentIndex = -1;
+    SimpleConvolution convolution;
+
+    void updateIR();
 
 private:
     //==============================================================================

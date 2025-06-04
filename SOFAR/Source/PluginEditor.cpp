@@ -13,9 +13,21 @@
 SOFARAudioProcessorEditor::SOFARAudioProcessorEditor (SOFARAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize (400, 300);
+    setSize (400, 200);
+
+    distanceSlider.setSliderStyle (juce::Slider::Rotary);
+    distanceSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 20);
+    addAndMakeVisible (distanceSlider);
+
+    distanceLabel.setText ("Distance", juce::dontSendNotification);
+    distanceLabel.attachToComponent (&distanceSlider, false);
+
+    distanceAttachment.reset (new juce::AudioProcessorValueTreeState::SliderAttachment(audioProcessor.parameters, "distance", distanceSlider));
+
+    attachButton (buttonA, 0);
+    attachButton (buttonB, 1);
+    attachButton (buttonC, 2);
+    attachButton (buttonD, 3);
 }
 
 SOFARAudioProcessorEditor::~SOFARAudioProcessorEditor()
@@ -25,16 +37,26 @@ SOFARAudioProcessorEditor::~SOFARAudioProcessorEditor()
 //==============================================================================
 void SOFARAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-
-    g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (15.0f));
-    g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
+    g.fillAll (juce::Colours::black);
 }
 
 void SOFARAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
+    auto area = getLocalBounds().reduced (20);
+    distanceSlider.setBounds (area.removeFromLeft (120));
+    auto buttonArea = area.removeFromTop (30);
+    buttonA.setBounds (buttonArea.removeFromLeft (40));
+    buttonB.setBounds (buttonArea.removeFromLeft (40));
+    buttonC.setBounds (buttonArea.removeFromLeft (40));
+    buttonD.setBounds (buttonArea.removeFromLeft (40));
+}
+
+void SOFARAudioProcessorEditor::attachButton(juce::TextButton& button, int index)
+{
+    addAndMakeVisible (button);
+    button.onClick = [this, index]
+    {
+        audioProcessor.parameters.getParameter("space")->setValueNotifyingHost ((float) index / 3.0f);
+        audioProcessor.updateIR();
+    };
 }
