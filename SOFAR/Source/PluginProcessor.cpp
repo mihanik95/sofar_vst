@@ -19,13 +19,25 @@ SOFARAudioProcessor::SOFARAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+       parameters (*this, nullptr, "PARAMS", createParameters())
 #endif
 {
+    updateIR();
 }
 
 SOFARAudioProcessor::~SOFARAudioProcessor()
 {
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout SOFARAudioProcessor::createParameters()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("distance", "Distance", 0.0f, 1.0f, 0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("pan", "Pan", -1.0f, 1.0f, 0.0f));
+    juce::StringArray choices { "A", "B", "C", "D" };
+    params.push_back (std::make_unique<juce::AudioParameterChoice> ("space", "Space", choices, 0));
+    return { params.begin(), params.end() };
 }
 
 //==============================================================================
@@ -93,14 +105,13 @@ void SOFARAudioProcessor::changeProgramName (int index, const juce::String& newN
 //==============================================================================
 void SOFARAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    convolution.prepare(getTotalNumInputChannels());
+    updateIR();
 }
 
 void SOFARAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
+    currentIR.clear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -135,26 +146,42 @@ void SOFARAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
+    auto distance = parameters.getRawParameterValue("distance")->load();
+    auto pan       = parameters.getRawParameterValue("pan")->load();
+    auto space     = (int) parameters.getRawParameterValue("space")->load();
 
-        // ..do something to the data...
+    if (space != currentIndex)
+        updateIR();
+
+    juce::AudioBuffer<float> wetBuffer;
+    wetBuffer.makeCopyOf (buffer);
+    convolution.process (wetBuffer);
+
+    float dryMix = 1.0f - distance;
+    float wetMix = distance;
+    float r = 1.0f + 9.0f * distance;
+    float attenuation = 1.0f / (r * r);
+
+    float panNorm = (pan + 1.0f) * 0.5f;
+    float angle = panNorm * juce::MathConstants<float>::halfPi;
+    float panL = std::cos(angle);
+    float panR = std::sin(angle);
+
+    auto* inL  = buffer.getWritePointer(0);
+    auto* inR  = totalNumInputChannels > 1 ? buffer.getWritePointer(1) : inL;
+    auto* wetL = wetBuffer.getReadPointer(0);
+    auto* wetR = wetBuffer.getNumChannels() > 1 ? wetBuffer.getReadPointer(1) : wetL;
+
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    {
+        float drySample = 0.5f * (inL[i] + inR[i]);
+        float l = drySample * dryMix * panL + wetL[i] * wetMix;
+        float rS = drySample * dryMix * panR + wetR[i] * wetMix;
+        inL[i] = l * attenuation;
+        inR[i] = rS * attenuation;
     }
 }
 
@@ -172,15 +199,18 @@ juce::AudioProcessorEditor* SOFARAudioProcessor::createEditor()
 //==============================================================================
 void SOFARAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
 void SOFARAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName (parameters.state.getType()))
+            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+    updateIR();
 }
 
 //==============================================================================
@@ -188,4 +218,16 @@ void SOFARAudioProcessor::setStateInformation (const void* data, int sizeInBytes
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new SOFARAudioProcessor();
+}
+
+void SOFARAudioProcessor::updateIR()
+{
+    int index = (int) parameters.getRawParameterValue("space")->load();
+    if (index != currentIndex)
+    {
+        currentIR = getIR(index);
+        convolution.loadImpulse(currentIR);
+        convolution.prepare(getTotalNumInputChannels());
+        currentIndex = index;
+    }
 }
