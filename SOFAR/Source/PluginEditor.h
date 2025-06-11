@@ -30,11 +30,14 @@ private:
     SOFARAudioProcessor& audioProcessor;
     juce::Slider distanceSlider;
     juce::Label distanceLabel;
+    juce::Slider panSlider;
+    juce::Label panLabel;
     juce::TextButton buttonA { "A" };
     juce::TextButton buttonB { "B" };
     juce::TextButton buttonC { "C" };
     juce::TextButton buttonD { "D" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> distanceAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
     void attachButton(juce::TextButton& button, int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SOFARAudioProcessorEditor)

@@ -14,10 +14,10 @@ inline std::vector<float> getIR(int index)
         for (int i = 0; i < len; ++i)
         {
             float t = (float)i / (float)len;
-            irA[i] = std::exp(-6.0f * t);
-            irB[i] = std::exp(-4.0f * t) * std::sin(juce::MathConstants<float>::twoPi * 0.1f * i);
-            irC[i] = std::exp(-8.0f * t) * (0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * i / len));
-            irD[i] = std::exp(-3.0f * t);
+            irA[i] = std::exp(-5.0f * t) * (0.8f + 0.2f * std::sin(juce::MathConstants<float>::twoPi * 0.05f * i));
+            irB[i] = std::exp(-3.0f * t) * (0.7f + 0.3f * std::cos(juce::MathConstants<float>::twoPi * 0.07f * i));
+            irC[i] = std::exp(-7.0f * t) * (0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * i / len));
+            irD[i] = std::exp(-2.0f * t) * std::sin(juce::MathConstants<float>::twoPi * 0.1f * i);
         }
         initialised = true;
     }

@@ -34,6 +34,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SOFARAudioProcessor::createP
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("distance", "Distance", 0.0f, 1.0f, 0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("pan", "Pan", -1.0f, 1.0f, 0.0f));
     juce::StringArray choices { "A", "B", "C", "D" };
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("space", "Space", choices, 0));
     return { params.begin(), params.end() };
@@ -149,7 +150,8 @@ void SOFARAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         buffer.clear (i, 0, buffer.getNumSamples());
 
     auto distance = parameters.getRawParameterValue("distance")->load();
-    auto space    = (int) parameters.getRawParameterValue("space")->load();
+    auto pan       = parameters.getRawParameterValue("pan")->load();
+    auto space     = (int) parameters.getRawParameterValue("space")->load();
 
     if (space != currentIndex)
         updateIR();
@@ -158,15 +160,28 @@ void SOFARAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     wetBuffer.makeCopyOf (buffer);
     convolution.process (wetBuffer);
 
-    float dryGain = 1.0f - distance;
-    float wetGain = distance;
+    float dryMix = 1.0f - distance;
+    float wetMix = distance;
+    float r = 1.0f + 9.0f * distance;
+    float attenuation = 1.0f / (r * r);
 
-    for (int ch = 0; ch < totalNumInputChannels; ++ch)
+    float panNorm = (pan + 1.0f) * 0.5f;
+    float angle = panNorm * juce::MathConstants<float>::halfPi;
+    float panL = std::cos(angle);
+    float panR = std::sin(angle);
+
+    auto* inL  = buffer.getWritePointer(0);
+    auto* inR  = totalNumInputChannels > 1 ? buffer.getWritePointer(1) : inL;
+    auto* wetL = wetBuffer.getReadPointer(0);
+    auto* wetR = wetBuffer.getNumChannels() > 1 ? wetBuffer.getReadPointer(1) : wetL;
+
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
-        auto* dry  = buffer.getWritePointer (ch);
-        auto* wet  = wetBuffer.getReadPointer (ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-            dry[i] = dry[i] * dryGain + wet[i] * wetGain;
+        float drySample = 0.5f * (inL[i] + inR[i]);
+        float l = drySample * dryMix * panL + wetL[i] * wetMix;
+        float rS = drySample * dryMix * panR + wetR[i] * wetMix;
+        inL[i] = l * attenuation;
+        inR[i] = rS * attenuation;
     }
 }
 
