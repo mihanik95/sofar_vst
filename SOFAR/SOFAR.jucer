@@ -11,6 +11,8 @@
       <FILE id="kC4GUp" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="U337K9" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="IRDAT" name="IRData.h" compile="0" resource="0" file="Source/IRData.h"/>
+      <FILE id="SCONV" name="SimpleConvolution.h" compile="0" resource="0" file="Source/SimpleConvolution.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
